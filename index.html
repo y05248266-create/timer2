@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>プレゼン・学習用 高機能Webタイマー</title>
+  <style>
+    /* --- ライトモード（デフォルト） --- */
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #000000;
+      --task-color: #111111;
+      --divider-color: #000000;
+      --panel-bg: #f2f4f7;
+      --panel-border: #d0d7de;
+      --input-bg: #ffffff;
+      --input-text: #000000;
+      --accent-color: #2e7d32;
+      --btn-secondary: #4a5568;
+      --progress-bg: #e2e8f0;
+      --progress-color: #ed8936;
+      --timeup-bg: #fed7d7;
+      --subtext-color: #555555;
+      --kbd-bg: #ffffff;
+      --kbd-border: #cccccc;
+      --modal-bg: #ffffff;
+      --modal-overlay: rgba(0, 0, 0, 0.5);
+    }
+
+    /* --- ダークモード --- */
+    body.dark-theme {
+      --bg-color: #121212;
+      --text-color: #ffffff;
+      --task-color: #ffffff;
+      --divider-color: #ffffff;
+      --panel-bg: rgba(255, 255, 255, 0.08);
+      --panel-border: #333333;
+      --input-bg: #222222;
+      --input-text: #ffffff;
+      --accent-color: #4caf50;
+      --btn-secondary: #4a5568;
+      --progress-bg: rgba(255, 255, 255, 0.1);
+      --progress-color: #ff9800;
+      --timeup-bg: #7f1d1d;
+      --subtext-color: #aaaaaa;
+      --kbd-bg: #333333;
+      --kbd-border: #555555;
+      --modal-bg: #1e1e1e;
+      --modal-overlay: rgba(0, 0, 0, 0.75);
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      box-sizing: border-box;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .header-buttons-container {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+    }
+
+    .header-btn {
+      background-color: var(--panel-bg);
+      color: var(--text-color);
+      border: 1px solid var(--panel-border);
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .clock-display {
+      position: absolute;
+      bottom: 8px;
+      left: 15px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: var(--subtext-color);
+      font-family: 'Courier New', Courier, monospace;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .progress-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 8px;
+      background-color: var(--progress-bg);
+      z-index: 5;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 100%;
+      background-color: var(--progress-color);
+      transition: width 0.3s linear, background-color 0.3s;
+    }
+
+    /* メイン表示領域 */
+    .display-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      flex-grow: 1;
+      padding: 10px;
+      box-sizing: border-box;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .task-display {
+      font-weight: 900;
+      text-align: center;
+      max-width: 90vw;
+      word-wrap: break-word;
+      color: var(--task-color);
+      letter-spacing: 1px;
+      line-height: 1.05;
+      transition: font-size 0.15s ease;
+      display: none;
+      margin-bottom: 2px;
+      flex-shrink: 1;
+      min-height: 0;
+    }
+
+    .task-display.has-text {
+      display: block;
+    }
+
+    .divider {
+      width: 85vw;
+      height: 3px;
+      background-color: var(--divider-color);
+      margin: 4px 0;
+      border-radius: 2px;
+      transition: background-color 0.3s;
+      display: none;
+      flex-shrink: 0;
+    }
+
+    .divider.has-text {
+      display: block;
+    }
+
+    /* タイマー表示 */
+    .timer-display {
+      font-size: min(22vw, 28vh);
+      font-weight: 900;
+      font-family: 'Courier New', Courier, monospace;
+      line-height: 0.85;
+      user-select: none;
+      letter-spacing: -2px;
+      color: var(--text-color);
+      transition: font-size 0.15s ease, color 0.3s ease;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .timer-display.solo-mode {
+      font-size: min(25vw, 35vh);
+    }
+
+    .timer-display.end-mode {
+      font-size: min(14vw, 18vh) !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      letter-spacing: 0;
+    }
+
+    /* 全画面オーバーレイメッセージ */
+    .fullscreen-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      z-index: 9999;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+      box-sizing: border-box;
+      text-align: center;
+      cursor: pointer;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .fullscreen-overlay.show {
+      display: flex;
+    }
+
+    .fullscreen-overlay-text {
+      font-size: min(12vw, 16vh);
+      font-weight: 900;
+      line-height: 1.25;
+      word-break: break-word;
+      user-select: none;
+    }
+
+    /* モーダル説明書 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: var(--modal-overlay);
+      z-index: 10000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background-color: var(--modal-bg);
+      color: var(--text-color);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 750px;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 24px;
+      box-sizing: border-box;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      position: relative;
+      line-height: 1.6;
+    }
+
+    .modal-close-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: transparent;
+      border: none;
+      font-size: 1.5rem;
+      color: var(--text-color);
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px 8px;
+    }
+
+    .modal-content h2 {
+      margin-top: 0;
+      border-bottom: 2px solid var(--accent-color);
+      padding-bottom: 8px;
+      font-size: 1.4rem;
+    }
+
+    .modal-content h3 {
+      margin-top: 20px;
+      margin-bottom: 8px;
+      font-size: 1.1rem;
+      color: var(--accent-color);
+    }
+
+    .modal-content ol, .modal-content ul {
+      padding-left: 20px;
+      margin-top: 6px;
+      margin-bottom: 12px;
+    }
+
+    .modal-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+
+    .modal-content th, .modal-content td {
+      border: 1px solid var(--panel-border);
+      padding: 8px;
+      text-align: left;
+    }
+
+    .modal-content th {
+      background-color: var(--panel-bg);
+    }
+
+    .warning-orange { color: #ff9800 !important; }
+    .warning-red { color: #f44336 !important; }
+
+    /* コントロールパネル */
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      padding: 10px 14px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      margin-bottom: 6px;
+      max-width: 98vw;
+      max-height: 52vh;
+      overflow-y: auto;
+      z-index: 20;
+      box-sizing: border-box;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 6px;
+      width: 100%;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .task-input, .end-msg-input, .alert-input, .direct-time-input {
+      padding: 5px 8px;
+      font-size: 0.85rem;
+      border: 1px solid var(--panel-border);
+      background: var(--input-bg);
+      color: var(--input-text);
+      border-radius: 6px;
+      text-align: center;
+      font-weight: bold;
+      box-sizing: border-box;
+    }
+
+    .task-input { width: 180px; }
+    .end-msg-input { width: 100px; }
+    .alert-input { width: 200px; }
+
+    .direct-time-input {
+      width: 175px;
+      max-width: 65vw;
+      background-color: #fffde7;
+      border-color: #fbc02d;
+    }
+    body.dark-theme .direct-time-input {
+      background-color: #332d00;
+      border-color: #fbc02d;
+    }
+
+    .preset-buttons, .quick-buttons, .buttons, .audio-controls {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      max-width: 720px;
+    }
+
+    button {
+      padding: 5px 9px;
+      font-size: 0.82rem;
+      font-weight: bold;
+      color: #ffffff;
+      background-color: var(--accent-color);
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: opacity 0.2s, background-color 0.2s;
+      white-space: nowrap;
+    }
+
+    button:hover { opacity: 0.85; }
+    button:disabled { background-color: #9e9e9e; cursor: not-allowed; opacity: 0.6; }
+    .btn-secondary { background-color: var(--btn-secondary); }
+    .btn-preset { background-color: #0077cc; }
+    .btn-alert { background-color: #4a5568; }
+    .btn-action { background-color: #d97706; }
+
+    .audio-controls {
+      font-size: 0.78rem;
+      color: var(--text-color);
+      font-weight: bold;
+    }
+
+    .shortcut-info {
+      font-size: 0.73rem;
+      color: var(--subtext-color);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      border-top: 1px solid var(--panel-border);
+      padding-top: 4px;
+      margin-top: 2px;
+    }
+
+    kbd {
+      background-color: var(--kbd-bg);
+      border: 1px solid var(--kbd-border);
+      border-radius: 3px;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.2);
+      color: var(--text-color);
+      font-family: monospace;
+      font-size: 0.7rem;
+      padding: 1px 4px;
+      font-weight: bold;
+    }
+
+    .time-up {
+      animation: blink 0.8s infinite alternate;
+    }
+
+    @keyframes blink {
+      0% { background-color: var(--bg-color); }
+      100% { background-color: var(--timeup-bg); }
+    }
+
+    /* --- 全画面表示時 --- */
+    :fullscreen .controls, :fullscreen .header-buttons-container { display: none !important; }
+    :fullscreen .display-container { padding: 2vh 2vw; justify-content: center; }
+    :fullscreen .divider.has-text { width: 85vw; height: min(6px, 1vh); margin: 1.5vh 0; }
+    :fullscreen .timer-display { font-size: min(25vw, 42vh); }
+    :fullscreen .timer-display.solo-mode { font-size: min(27vw, 48vh); }
+    :fullscreen .timer-display.end-mode { font-size: min(15vw, 25vh) !important; }
+    :fullscreen .clock-display { font-size: min(2rem, 4vh); bottom: 20px; left: 25px; }
+
+    :-webkit-full-screen .controls, :-webkit-full-screen .header-buttons-container { display: none !important; }
+    :-webkit-full-screen .display-container { padding: 2vh 2vw; justify-content: center; }
+    :-webkit-full-screen .divider.has-text { width: 85vw; height: min(6px, 1vh); margin: 1.5vh 0; }
+    :-webkit-full-screen .timer-display { font-size: min(25vw, 42vh); }
+    :-webkit-full-screen .timer-display.solo-mode { font-size: min(27vw, 48vh); }
+    :-webkit-full-screen .timer-display.end-mode { font-size: min(15vw, 25vh) !important; }
+    :-webkit-full-screen .clock-display { font-size: min(2rem, 4vh); bottom: 20px; left: 25px; }
+  </style>
+</head>
+<body>
+
+  <div class="header-buttons-container">
+    <button class="header-btn" onclick="openModal()">📖 説明書</button>
+    <button class="header-btn" id="themeBtn" onclick="toggleTheme()">🌙 ダークモード</button>
+  </div>
+
+  <div class="progress-container">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <div class="display-container" id="mainArea">
+    <div class="task-display" id="taskDisplay"></div>
+    <div class="divider" id="divider"></div>
+    <div class="timer-display solo-mode" id="display">25:00</div>
+  </div>
+
+  <!-- 全画面オーバーレイメッセージ -->
+  <div class="fullscreen-overlay" id="fullscreenOverlay" onclick="hideFullMessage(false)">
+    <div class="fullscreen-overlay-text" id="overlayText">静かに話を聞きましょう</div>
+  </div>
+
+  <!-- モーダル説明書 -->
+  <div class="modal-overlay" id="helpModal" onclick="closeModalOnOverlay(event)">
+    <div class="modal-content">
+      <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+      <h2>📖 高機能Webタイマー 取扱説明書</h2>
+      
+      <h3>🌟 本タイマーの優れたポイント</h3>
+      <ul>
+        <li><strong>見やすい極大フォント:</strong> 教室の後ろからでも一目瞭然。課題名の長さに応じてサイズが自動リサイズされます。</li>
+        <li><strong>「文字全画面」で一括指示:</strong> 「静かに話を聞きましょう」などの指示文を全画面にドカンと拡大表示できます。</li>
+        <li><strong>ワンキーショートカット:</strong> <code>Space</code>でスタート/ストップ、<code>F</code>で全画面。日本語入力（IME）がONでも誤作動しません。</li>
+        <li><strong>テンキー直打ち対応:</strong> 「0321」と打つだけで「3分21秒」が即時セット（全角「０３２１」も自動対応）。</li>
+        <li><strong>残り時間の視覚化:</strong> 画面上部のプログレスバーが徐々に減少。時間の感覚を掴みやすくなります。</li>
+        <li><strong>警告カラー変化:</strong> 残り1分でオレンジ、10秒で赤に変化してラストスパートを促します。</li>
+        <li><strong>デジタル時計常時表示:</strong> 現在時刻をリアルタイム表示し、終了時間を意識できます。</li>
+        <li><strong>暗くできるダークモード:</strong> 電子黒板やプロジェクター投影でも目が疲れにくい調整が可能です。</li>
+        <li><strong>完全無料・通信なし:</strong> 広告や外部通信がなく、入力内容が外部へ送信される心配もありません。</li>
+      </ul>
+
+      <h3>🚀 基本的な使い方</h3>
+      <ol>
+        <li><strong>時間をセットする:</strong> プリセットボタン（1分, 3分など）を押すか、黄色のフォームに数字を入力（例: 0500➔5分）して「設定」を押します。</li>
+        <li><strong>課題名を表示する:</strong> 「課題名」欄に入力するとタイマーの上に大きく表示されます。</li>
+        <li><strong>タイマー開始:</strong> 「スタート」または <code>Space</code> キーを押します。</li>
+        <li><strong>画面モードの活用:</strong> <code>F</code> キーで「時間全画面」、<code>M</code> キーで「文字全画面」表示になります。</li>
+      </ol>
+
+      <h3>⌨️ ショートカットキー一覧</h3>
+      <table>
+        <thead>
+          <tr><th>キー</th><th>動作</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Space</code></td><td>スタート / ストップ</td></tr>
+          <tr><td><code>R</code></td><td>リセット</td></tr>
+          <tr><td><code>F</code></td><td>時間全画面表示の切替</td></tr>
+          <tr><td><code>M</code></td><td>文字全画面表示 / 解除</td></tr>
+          <tr><td><code>Esc</code></td><td>全画面・説明書を閉じる</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="clock-display" id="clockDisplay">00:00:00</div>
+
+  <div class="controls" id="controlsPanel">
+    <div class="input-row">
+      <input type="text" id="directTimeInput" class="direct-time-input" placeholder="例: 0321 ➔ 03:21" onkeydown="if(event.key==='Enter') applyDirectTime()">
+      <button onclick="applyDirectTime()" class="btn-action">設定</button>
+      <button onclick="clearDirectTime()" class="btn-secondary">クリア</button>
+    </div>
+
+    <div class="input-row">
+      <input type="text" id="taskInput" class="task-input" maxlength="30" placeholder="課題名（最大30文字）">
+      <input type="text" id="endMsgInput" class="end-msg-input" value="終了！" placeholder="終了時メッセージ">
+    </div>
+
+    <div class="input-row">
+      <input type="text" id="alertInput" class="alert-input" value="静かに話を聞きましょう" placeholder="表示するメッセージ">
+      <button onclick="triggerFullMessage()" class="btn-alert">📢 文字全画面表示 [M]</button>
+    </div>
+
+    <div class="preset-buttons">
+      <button onclick="setPreset(1)" class="btn-preset">1分</button>
+      <button onclick="setPreset(3)" class="btn-preset">3分</button>
+      <button onclick="setPreset(5)" class="btn-preset">5分</button>
+      <button onclick="setPreset(10)" class="btn-preset">10分</button>
+      <button onclick="setPreset(15)" class="btn-preset">15分</button>
+      <button onclick="setPreset(20)" class="btn-preset">20分</button>
+      <button onclick="setPreset(25)" class="btn-preset">25分</button>
+      <button onclick="setPreset(30)" class="btn-preset">30分</button>
+      <button onclick="setPreset(35)" class="btn-preset">35分</button>
+      <button onclick="setPreset(40)" class="btn-preset">40分</button>
+      <button onclick="setPreset(45)" class="btn-preset">45分</button>
+      <button onclick="setPreset(50)" class="btn-preset">50分</button>
+      <button onclick="setPreset(60)" class="btn-preset">60分</button>
+    </div>
+
+    <div class="quick-buttons">
+      <button onclick="addMinutes(10)" class="btn-secondary">+10分</button>
+      <button onclick="addMinutes(1)" class="btn-secondary">+1分</button>
+      <button onclick="addSeconds(30)" class="btn-secondary">+30秒</button>
+      <button onclick="addSeconds(-30)" class="btn-secondary">-30秒</button>
+      <button onclick="addMinutes(-1)" class="btn-secondary">-1分</button>
+      <button onclick="addMinutes(-10)" class="btn-secondary">-10分</button>
+    </div>
+
+    <div class="buttons">
+      <button id="startBtn" onclick="startTimer()">スタート</button>
+      <button id="stopBtn" onclick="stopTimer()" class="btn-secondary">ストップ</button>
+      <button id="resetBtn" onclick="resetTimer()" class="btn-secondary">リセット</button>
+      <button id="fullscreenBtn" onclick="toggleFullscreen()" class="btn-secondary">時間全画面表示 [F]</button>
+    </div>
+
+    <div class="audio-controls">
+      <label for="volume">音量: </label>
+      <input type="range" id="volume" min="0" max="1" step="0.01" value="0">
+      <button onclick="testSound()" class="btn-secondary" style="padding: 1px 6px; font-size: 0.75rem; margin-left: 4px;">テスト再生</button>
+    </div>
+
+    <div class="shortcut-info">
+      <span><kbd>Space</kbd> スタート/ストップ</span>
+      <span><kbd>R</kbd> リセット</span>
+      <span><kbd>F</kbd> 時間全画面表示</span>
+      <span><kbd>M</kbd> 文字全画面表示</span>
+    </div>
+  </div>
+
+  <script>
+    let timerId = null;
+    let alarmIntervalId = null;
+    let totalSeconds = 25 * 60;
+    let initialTotalSeconds = 25 * 60;
+    let audioCtx = null;
+
+    const display = document.getElementById('display');
+    const taskInput = document.getElementById('taskInput');
+    const endMsgInput = document.getElementById('endMsgInput');
+    const taskDisplay = document.getElementById('taskDisplay');
+    const divider = document.getElementById('divider');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const volumeInput = document.getElementById('volume');
+    const progressBar = document.getElementById('progressBar');
+    const themeBtn = document.getElementById('themeBtn');
+    const clockDisplay = document.getElementById('clockDisplay');
+
+    const fullscreenOverlay = document.getElementById('fullscreenOverlay');
+    const alertInput = document.getElementById('alertInput');
+    const overlayText = document.getElementById('overlayText');
+    const directTimeInput = document.getElementById('directTimeInput');
+    const helpModal = document.getElementById('helpModal');
+
+    function updateClock() {
+      const now = new Date();
+      const h = now.getHours().toString().padStart(2, '0');
+      const m = now.getMinutes().toString().padStart(2, '0');
+      const s = now.getSeconds().toString().padStart(2, '0');
+      clockDisplay.textContent = `${h}:${m}:${s}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function openModal() {
+      helpModal.classList.add('show');
+    }
+
+    function closeModal() {
+      helpModal.classList.remove('show');
+    }
+
+    function closeModalOnOverlay(e) {
+      if (e.target === helpModal) {
+        closeModal();
+      }
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('dark-theme');
+      const isDark = document.body.classList.contains('dark-theme');
+      themeBtn.textContent = isDark ? '☀️ ライトモード' : '🌙 ダークモード';
+    }
+
+    function updateTaskState() {
+      const val = taskInput.value.trim();
+      const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
+
+      if (val === '') {
+        taskDisplay.classList.remove('has-text');
+        divider.classList.remove('has-text');
+        display.classList.add('solo-mode');
+      } else {
+        taskDisplay.textContent = val;
+        taskDisplay.classList.add('has-text');
+        divider.classList.add('has-text');
+        display.classList.remove('solo-mode');
+
+        const len = val.length;
+        let fontSize;
+        if (len <= 5) fontSize = isFullscreen ? 'min(12vw, 15vh)' : 'clamp(1.5rem, 6vh, 4.5vw)';
+        else if (len <= 12) fontSize = isFullscreen ? 'min(9vw, 11vh)' : 'clamp(1.2rem, 4.5vh, 3.8vw)';
+        else if (len <= 20) fontSize = isFullscreen ? 'min(7vw, 8vh)' : 'clamp(1rem, 3.5vh, 3vw)';
+        else fontSize = isFullscreen ? 'min(5vw, 6vh)' : 'clamp(0.9rem, 2.8vh, 2.2vw)';
+
+        taskDisplay.style.fontSize = fontSize;
+      }
+    }
+
+    taskInput.addEventListener('input', updateTaskState);
+    document.addEventListener('fullscreenchange', updateTaskState);
+    document.addEventListener('webkitfullscreenchange', updateTaskState);
+    window.addEventListener('resize', updateTaskState);
+
+    function applyDirectTime() {
+      stopTimer();
+      clearTimeUpState();
+
+      let val = directTimeInput.value.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xfee0)).replace(/\D/g, '');
+      
+      if (!val) return;
+
+      const padded = val.padStart(4, '0');
+      const m = parseInt(padded.slice(-4, -2), 10);
+      const s = parseInt(padded.slice(-2), 10);
+
+      totalSeconds = m * 60 + s;
+      initialTotalSeconds = totalSeconds;
+
+      updateDisplay(totalSeconds);
+      directTimeInput.blur();
+    }
+
+    function clearDirectTime() {
+      directTimeInput.value = '';
+      directTimeInput.blur();
+    }
+
+    function triggerFullMessage() {
+      const msg = alertInput.value.trim() || "静かに話を聞きましょう";
+      overlayText.textContent = msg;
+      fullscreenOverlay.classList.add('show');
+
+      const doc = document.documentElement;
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        if (doc.requestFullscreen) doc.requestFullscreen().catch(() => {});
+        else if (doc.webkitRequestFullscreen) doc.webkitRequestFullscreen();
+      }
+    }
+
+    function hideFullMessage(keepFullscreen = false) {
+      fullscreenOverlay.classList.remove('show');
+      if (!keepFullscreen && (document.fullscreenElement || document.webkitFullscreenElement)) {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      }
+    }
+
+    function clearTimeUpState() {
+      stopAlarmLoop();
+      document.body.classList.remove('time-up');
+      display.classList.remove('end-mode', 'warning-orange', 'warning-red');
+    }
+
+    function updateDisplay(sec) {
+      if (document.body.classList.contains('time-up')) return;
+
+      display.classList.remove('end-mode');
+      const m = Math.floor(sec / 60).toString().padStart(2, '0');
+      const s = (sec % 60).toString().padStart(2, '0');
+      display.textContent = `${m}:${s}`;
+
+      display.classList.remove('warning-orange', 'warning-red');
+      if (timerId) {
+        if (sec <= 10 && sec > 0) {
+          display.classList.add('warning-red');
+        } else if (sec <= 60 && sec > 10) {
+          display.classList.add('warning-orange');
+        }
+      }
+
+      updateProgress();
+    }
+
+    function updateProgress() {
+      if (document.body.classList.contains('time-up')) {
+        progressBar.style.width = '0%';
+        return;
+      }
+      if (initialTotalSeconds > 0) {
+        const percentage = (totalSeconds / initialTotalSeconds) * 100;
+        progressBar.style.width = `${Math.max(0, percentage)}%`;
+      } else {
+        progressBar.style.width = '100%';
+      }
+    }
+
+    function setPreset(min) {
+      stopTimer();
+      clearTimeUpState();
+      totalSeconds = min * 60;
+      initialTotalSeconds = totalSeconds;
+      updateDisplay(totalSeconds);
+    }
+
+    function addMinutes(amount) { addSeconds(amount * 60); }
+
+    function addSeconds(amount) {
+      clearTimeUpState();
+      const MAX_SEC = 99 * 60 + 59;
+      totalSeconds = Math.min(MAX_SEC, Math.max(0, totalSeconds + amount));
+      if (!timerId) initialTotalSeconds = totalSeconds;
+      updateDisplay(totalSeconds);
+    }
+
+    function startTimer() {
+      if (timerId) return;
+      clearTimeUpState();
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (totalSeconds <= 0) return;
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+
+      timerId = setInterval(() => {
+        totalSeconds--;
+        updateDisplay(totalSeconds);
+
+        if (totalSeconds <= 0) {
+          clearInterval(timerId);
+          timerId = null;
+          
+          document.body.classList.add('time-up');
+          display.textContent = endMsgInput.value.trim() || '終了！';
+          display.classList.add('end-mode');
+          display.classList.remove('warning-orange', 'warning-red');
+          updateProgress();
+          
+          startAlarmLoop();
+          resetControls();
+        }
+      }, 1000);
+    }
+
+    function stopTimer() {
+      clearTimeUpState();
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      display.classList.remove('warning-orange', 'warning-red');
+    }
+
+    function resetTimer() {
+      stopTimer();
+      clearTimeUpState();
+      totalSeconds = 0;
+      initialTotalSeconds = 0;
+      updateDisplay(0);
+      resetControls();
+    }
+
+    function resetControls() {
+      startBtn.disabled = false;
+      stopBtn.disabled = false;
+    }
+
+    function startAlarmLoop() {
+      stopAlarmLoop();
+      playAlarm();
+      alarmIntervalId = setInterval(playAlarm, 1800);
+    }
+
+    function stopAlarmLoop() {
+      if (alarmIntervalId) {
+        clearInterval(alarmIntervalId);
+        alarmIntervalId = null;
+      }
+    }
+
+    function playAlarm() {
+      const volume = parseFloat(volumeInput.value);
+      if (volume === 0) return;
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      const now = audioCtx.currentTime;
+      for (let i = 0; i < 4; i++) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now + i * 0.25);
+        gain.gain.setValueAtTime(volume, now + i * 0.25);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.25 + 0.18);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + i * 0.25);
+        osc.stop(now + i * 0.25 + 0.18);
+      }
+    }
+
+    function testSound() { playAlarm(); }
+
+    function toggleFullscreen() {
+      const doc = document.documentElement;
+      const fsDoc = document.fullscreenElement || document.webkitFullscreenElement;
+
+      if (!fsDoc) {
+        if (doc.requestFullscreen) doc.requestFullscreen().catch(err => alert(err.message));
+        else if (doc.webkitRequestFullscreen) doc.webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const isOverlayShown = fullscreenOverlay.classList.contains('show');
+      const isModalShown = helpModal.classList.contains('show');
+      const key = e.key;
+      const code = e.code;
+
+      if (isModalShown) {
+        if (key === 'Escape') {
+          closeModal();
+        }
+        return;
+      }
+
+      if (isOverlayShown) {
+        if (key === 'Escape' || code === 'KeyM' || key === 'm' || key === 'M' || key === 'も') {
+          hideFullMessage(false);
+          return;
+        }
+        if (code === 'KeyF' || key === 'f' || key === 'F' || key === 'は') {
+          e.preventDefault();
+          hideFullMessage(true);
+          return;
+        }
+        return;
+      }
+
+      const activeEl = document.activeElement;
+      const isInputActive = activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName);
+
+      if (isInputActive) {
+        if (key === 'Enter') {
+          activeEl.blur();
+        }
+        return;
+      }
+
+      if (code === 'Space') {
+        e.preventDefault();
+        if (timerId || alarmIntervalId) {
+          stopTimer();
+        } else {
+          startTimer();
+        }
+      } else if (code === 'KeyR' || key === 'r' || key === 'R' || key === 'す') {
+        e.preventDefault();
+        resetTimer();
+      } else if (code === 'KeyF' || key === 'f' || key === 'F' || key === 'は') {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (code === 'KeyM' || key === 'm' || key === 'M' || key === 'も') {
+        e.preventDefault();
+        triggerFullMessage();
+      }
+    });
+  </script>
+</body>
+</html>
